@@ -309,6 +309,7 @@ def get_settings_defaults(template_name: str | None = None) -> dict[str, Any]:
     frame = template.get("frame", {})
     text_area = template.get("text_area", {})
     canvas_extra = template.get("canvas_extra", {})
+    text_outline = template.get("text_outline", {})
     title = template.get("title", {})
     subtitle = template.get("subtitle", {})
 
@@ -323,6 +324,8 @@ def get_settings_defaults(template_name: str | None = None) -> dict[str, Any]:
         "frame_thickness": get_int(frame, "thickness", -1, minimum=-1),
         "text_padding_x": get_int(text_area, "padding_x", -1, minimum=-1),
         "text_padding_bottom": get_int(text_area, "padding_bottom", -1, minimum=-1),
+        "outline_color": str(text_outline.get("color", "#000000")),
+        "outline_thickness": get_int(text_outline, "thickness", -1, minimum=-1),
         "gap_from_image": get_int(text_area, "gap_from_image", -1, minimum=-1),
         "block_spacing": get_int(text_area, "block_spacing", -1, minimum=-1),
         "multiline_spacing": get_int(text_area, "multiline_spacing", -1, minimum=-1),
@@ -334,6 +337,7 @@ def get_settings_defaults(template_name: str | None = None) -> dict[str, Any]:
         "subtitle_min_size": get_int(subtitle, "min_size", -1, minimum=-1),
         "font_name": get_primary_font_name(template),
     }
+
 
 def get_int(data: dict[str, Any], key: str, default: int, minimum: int = 0) -> int:
     value = data.get(key, default)
@@ -571,7 +575,7 @@ def load_font(font_config: Any, size: int):
     return ImageFont.load_default()
 
 
-def measure_text(draw, text: str, font, multiline_spacing: int) -> tuple[int, int, tuple[int, int, int, int]]:
+def measure_text(draw, text: str, font, multiline_spacing: int, outline_thickness: int) -> tuple[int, int, tuple[int, int, int, int]]:
     if not text:
         return 0, 0, (0, 0, 0, 0)
 
@@ -581,24 +585,25 @@ def measure_text(draw, text: str, font, multiline_spacing: int) -> tuple[int, in
         font=font,
         align="center",
         spacing=multiline_spacing,
+        stroke_width=max(0, outline_thickness),
     )
     width = bbox[2] - bbox[0]
     height = bbox[3] - bbox[1]
     return width, height, bbox
 
 
-def fit_font(draw, text: str, font_config: Any, size: int, min_size: int, max_width: int, multiline_spacing: int):
+def fit_font(draw, text: str, font_config: Any, size: int, min_size: int, max_width: int, multiline_spacing: int, outline_thickness: int):
     current_size = max(min_size, size)
 
     while current_size >= min_size:
         font = load_font(font_config, current_size)
-        width, height, bbox = measure_text(draw, text, font, multiline_spacing)
+        width, height, bbox = measure_text(draw, text, font, multiline_spacing, outline_thickness)
         if not text or width <= max_width:
             return font, width, height, bbox, current_size
         current_size -= 1
 
     font = load_font(font_config, min_size)
-    width, height, bbox = measure_text(draw, text, font, multiline_spacing)
+    width, height, bbox = measure_text(draw, text, font, multiline_spacing, outline_thickness)
     return font, width, height, bbox, min_size
 
 
@@ -625,6 +630,7 @@ def apply_settings_override(template: dict[str, Any], settings: Any) -> dict[str
     frame = result.setdefault("frame", {})
     text_area = result.setdefault("text_area", {})
     canvas_extra = result.setdefault("canvas_extra", {})
+    text_outline = result.setdefault("text_outline", {})
     title = result.setdefault("title", {})
     subtitle = result.setdefault("subtitle", {})
     font = result.setdefault("font", {})
@@ -636,6 +642,8 @@ def apply_settings_override(template: dict[str, Any], settings: Any) -> dict[str
     apply_int_override(frame, "thickness", settings.get("frame_thickness"))
     apply_int_override(text_area, "padding_x", settings.get("text_padding_x"))
     apply_int_override(text_area, "padding_bottom", settings.get("text_padding_bottom"))
+    apply_string_override(text_outline, "color", settings.get("outline_color"))
+    apply_int_override(text_outline, "thickness", settings.get("outline_thickness"))
     apply_int_override(text_area, "gap_from_image", settings.get("gap_from_image"))
     apply_int_override(text_area, "block_spacing", settings.get("block_spacing"))
     apply_int_override(text_area, "multiline_spacing", settings.get("multiline_spacing"))
@@ -656,6 +664,7 @@ def apply_settings_override(template: dict[str, Any], settings: Any) -> dict[str
 
 def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: str, canvas_width: int, available_height: int) -> dict[str, Any]:
     text_area = template.get("text_area", {})
+    text_outline = template.get("text_outline", {})
     shared_font_config = template.get("font", {})
     title_config = template.get("title", {})
     subtitle_config = template.get("subtitle", {})
@@ -664,6 +673,8 @@ def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: st
     max_width = max(1, canvas_width - (padding_x * 2))
     block_spacing = get_int(text_area, "block_spacing", 8, minimum=0)
     multiline_spacing = get_int(text_area, "multiline_spacing", 4, minimum=0)
+    outline_thickness = get_int(text_outline, "thickness", 0, minimum=0)
+    outline_color = get_color(text_outline.get("color"), "#000000")
 
     title_size = get_int(title_config, "size", 40, minimum=1)
     subtitle_size = get_int(subtitle_config, "size", 32, minimum=1)
@@ -681,6 +692,7 @@ def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: st
         title_min_size,
         max_width,
         multiline_spacing,
+        outline_thickness,
     )
     subtitle_font, subtitle_width, subtitle_height, subtitle_bbox, subtitle_size = fit_font(
         draw,
@@ -690,6 +702,7 @@ def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: st
         subtitle_min_size,
         max_width,
         multiline_spacing,
+        outline_thickness,
     )
 
     while True:
@@ -714,6 +727,7 @@ def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: st
                 subtitle_min_size,
                 max_width,
                 multiline_spacing,
+                outline_thickness,
             )
             continue
 
@@ -727,6 +741,7 @@ def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: st
                 title_min_size,
                 max_width,
                 multiline_spacing,
+                outline_thickness,
             )
             continue
 
@@ -736,6 +751,8 @@ def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: st
         "max_width": max_width,
         "block_spacing": block_spacing,
         "multiline_spacing": multiline_spacing,
+        "outline_thickness": outline_thickness,
+        "outline_color": outline_color,
         "title": {
             "font": title_font,
             "width": title_width,
@@ -753,7 +770,7 @@ def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: st
     }
 
 
-def draw_centered_text(draw, canvas_width: int, y: int, text: str, font, fill: tuple[int, int, int], bbox: tuple[int, int, int, int], multiline_spacing: int) -> None:
+def draw_centered_text(draw, canvas_width: int, y: int, text: str, font, fill: tuple[int, int, int], bbox: tuple[int, int, int, int], multiline_spacing: int, outline_thickness: int, outline_color: tuple[int, int, int]) -> None:
     if not text:
         return
 
@@ -767,6 +784,8 @@ def draw_centered_text(draw, canvas_width: int, y: int, text: str, font, fill: t
         fill=fill,
         align="center",
         spacing=multiline_spacing,
+        stroke_width=max(0, outline_thickness),
+        stroke_fill=outline_color,
     )
 
 
@@ -813,7 +832,7 @@ def render_classic_demotivator(image, template: dict[str, Any], title: str, subt
     image_x = get_int(image_offset, "x", 20, minimum=0)
     image_y = get_int(image_offset, "y", 20, minimum=0)
     frame_gap = get_int(frame, "gap", 1, minimum=0)
-    frame_thickness = get_int(frame, "thickness", 1, minimum=1)
+    frame_thickness = get_int(frame, "thickness", 1, minimum=0)
     gap_from_image = get_int(text_area, "gap_from_image", 20, minimum=0)
     padding_bottom = get_int(text_area, "padding_bottom", 16, minimum=0)
     extra_width = get_int(canvas_extra, "width", 40, minimum=0)
@@ -831,20 +850,21 @@ def render_classic_demotivator(image, template: dict[str, Any], title: str, subt
     canvas.paste(source, (image_x, image_y))
     draw = ImageDraw.Draw(canvas)
 
-    frame_left = image_x - frame_gap - frame_thickness
-    frame_top = image_y - frame_gap - frame_thickness
-    frame_right = image_x + source_width + frame_gap + frame_thickness - 1
-    frame_bottom = image_y + source_height + frame_gap + frame_thickness - 1
-    for offset in range(frame_thickness):
-        draw.rectangle(
-            (
-                frame_left + offset,
-                frame_top + offset,
-                frame_right - offset,
-                frame_bottom - offset,
-            ),
-            outline=frame_color,
-        )
+    if frame_thickness > 0:
+        frame_left = image_x - frame_gap - frame_thickness
+        frame_top = image_y - frame_gap - frame_thickness
+        frame_right = image_x + source_width + frame_gap + frame_thickness - 1
+        frame_bottom = image_y + source_height + frame_gap + frame_thickness - 1
+        for offset in range(frame_thickness):
+            draw.rectangle(
+                (
+                    frame_left + offset,
+                    frame_top + offset,
+                    frame_right - offset,
+                    frame_bottom - offset,
+                ),
+                outline=frame_color,
+            )
 
     text_start_y = image_y + source_height + gap_from_image
     available_text_height = max(1, canvas_height - text_start_y - padding_bottom)
@@ -871,6 +891,8 @@ def render_classic_demotivator(image, template: dict[str, Any], title: str, subt
             text_color,
             title_layout["bbox"],
             layout["multiline_spacing"],
+            layout["outline_thickness"],
+            layout["outline_color"],
         )
         current_y += title_layout["height"]
 
@@ -886,6 +908,8 @@ def render_classic_demotivator(image, template: dict[str, Any], title: str, subt
             text_color,
             subtitle_layout["bbox"],
             layout["multiline_spacing"],
+            layout["outline_thickness"],
+            layout["outline_color"],
         )
 
     return canvas
@@ -920,6 +944,8 @@ class ArtemKo7vMememizatorSettings:
                 "frame_thickness": ("INT", {"default": defaults["frame_thickness"], "min": -1, "max": 8192}),
                 "text_padding_x": ("INT", {"default": defaults["text_padding_x"], "min": -1, "max": 8192}),
                 "text_padding_bottom": ("INT", {"default": defaults["text_padding_bottom"], "min": -1, "max": 8192}),
+                "outline_color": ("STRING", {"default": defaults["outline_color"], "multiline": False}),
+                "outline_thickness": ("INT", {"default": defaults["outline_thickness"], "min": -1, "max": 8192}),
                 "gap_from_image": ("INT", {"default": defaults["gap_from_image"], "min": -1, "max": 8192}),
                 "block_spacing": ("INT", {"default": defaults["block_spacing"], "min": -1, "max": 8192}),
                 "multiline_spacing": ("INT", {"default": defaults["multiline_spacing"], "min": -1, "max": 8192}),
@@ -945,6 +971,8 @@ class ArtemKo7vMememizatorSettings:
         frame_thickness,
         text_padding_x,
         text_padding_bottom,
+        outline_color,
+        outline_thickness,
         gap_from_image,
         block_spacing,
         multiline_spacing,
@@ -968,6 +996,8 @@ class ArtemKo7vMememizatorSettings:
                 "frame_thickness": frame_thickness,
                 "text_padding_x": text_padding_x,
                 "text_padding_bottom": text_padding_bottom,
+                "outline_color": outline_color,
+                "outline_thickness": outline_thickness,
                 "gap_from_image": gap_from_image,
                 "block_spacing": block_spacing,
                 "multiline_spacing": multiline_spacing,
@@ -980,6 +1010,7 @@ class ArtemKo7vMememizatorSettings:
                 "font_name": font_name,
             },
         )
+
 
 class ArtemKo7vMememizator:
     CATEGORY = "ArtemKo7v"

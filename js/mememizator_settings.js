@@ -48,6 +48,7 @@ function getTemplateWidgetValues(template, fontOptions) {
   const imageOffset = template.image_offset ?? {};
   const frame = template.frame ?? {};
   const textArea = template.text_area ?? {};
+  const textOutline = template.text_outline ?? {};
   const canvasExtra = template.canvas_extra ?? {};
   const title = template.title ?? {};
   const subtitle = template.subtitle ?? {};
@@ -64,6 +65,8 @@ function getTemplateWidgetValues(template, fontOptions) {
     frame_thickness: frame.thickness ?? -1,
     text_padding_x: textArea.padding_x ?? -1,
     text_padding_bottom: textArea.padding_bottom ?? -1,
+    outline_color: textOutline.color ?? "#000000",
+    outline_thickness: textOutline.thickness ?? -1,
     gap_from_image: textArea.gap_from_image ?? -1,
     block_spacing: textArea.block_spacing ?? -1,
     multiline_spacing: textArea.multiline_spacing ?? -1,
