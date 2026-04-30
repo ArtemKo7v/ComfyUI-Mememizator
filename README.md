@@ -1,6 +1,8 @@
 # ComfyUI-Mememizator
 ComfyUI node to make memes and demotivators.
 
+![Example](images/image01.png)
+
 ## Configuration
 
 On first launch the config file will be saved to:
@@ -30,6 +32,6 @@ are shown in the node dropdown. After changing the list of templates, restart Co
 
 ## Example
 
-![Example](example/example.png)
+![Example](examples/example.png)
 
-Workflow can be used from the image above or imported directly from [example/workflow.json](example/workflow.json).
+Workflow can be used from the image above or downloaded from [examples/workflow_basic.json](examples/workflow_basic.json) or [examples/workflow_settings.json](examples/workflow_settings.json).
