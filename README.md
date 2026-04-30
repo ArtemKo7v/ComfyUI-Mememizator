@@ -29,5 +29,7 @@ https://font.download/dl/font/tr-impact.zip
 
 `ArtemKo7vMememizatorSettings` builds UI overrides for the main meme node. Connect it to the optional `settings` input on `ArtemKo7vMememizator` to override config values without editing JSON.
 
+The settings node also includes a `template_name` dropdown. On the client side, it loads the current config and fills the other fields from the selected template.
+
 Edit the user config to add or change templates. Template names from `templates[].name`
 are shown in the node dropdown. After changing the list of templates, restart ComfyUI.

@@ -8,6 +8,19 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+try:
+    from aiohttp import web
+    from server import PromptServer
+except ImportError:
+    PromptServer = None
+    web = None
+try:
+    from aiohttp import web
+    from server import PromptServer
+except ImportError:
+    PromptServer = None
+    web = None
+
 
 BASE_DIR = Path(__file__).resolve().parent
 USER_DIR = Path(os.getcwd()) / "user" / "default"
@@ -241,6 +254,12 @@ def load_config() -> dict[str, Any]:
 
 CONFIG = load_config()
 
+if PromptServer is not None and web is not None:
+    routes = PromptServer.instance.routes
+
+    @routes.get("/artemko7v/mememizator/config")
+    async def mememizator_config_route(request):
+        return web.json_response(load_config())
 
 def get_template_names() -> tuple[str, ...]:
     templates = load_config().get("templates", [])
@@ -270,6 +289,51 @@ def get_template_config(template_name: str) -> dict[str, Any]:
 
     raise RuntimeError("No meme templates found in config.json")
 
+
+def get_first_template_name() -> str:
+    names = get_template_names()
+    return names[0]
+
+
+def get_primary_font_name(template: dict[str, Any]) -> str:
+    for key in ("font", "title", "subtitle"):
+        candidates = get_font_candidates(template.get(key, {}))
+        if candidates:
+            return Path(candidates[0]).name
+    return TEMPLATE_DEFAULT_FONT
+
+
+def get_settings_defaults(template_name: str | None = None) -> dict[str, Any]:
+    template = get_template_config(template_name or get_first_template_name())
+    image_offset = template.get("image_offset", {})
+    frame = template.get("frame", {})
+    text_area = template.get("text_area", {})
+    canvas_extra = template.get("canvas_extra", {})
+    title = template.get("title", {})
+    subtitle = template.get("subtitle", {})
+
+    return {
+        "template_name": template.get("name", get_first_template_name()),
+        "background": str(template.get("background_color", "")),
+        "text": str(template.get("text_color", "")),
+        "padding_x": get_int(image_offset, "x", -1, minimum=-1),
+        "padding_y": get_int(image_offset, "y", -1, minimum=-1),
+        "frame_color": str(frame.get("color", "")),
+        "frame_gap": get_int(frame, "gap", -1, minimum=-1),
+        "frame_thickness": get_int(frame, "thickness", -1, minimum=-1),
+        "text_padding_x": get_int(text_area, "padding_x", -1, minimum=-1),
+        "text_padding_bottom": get_int(text_area, "padding_bottom", -1, minimum=-1),
+        "gap_from_image": get_int(text_area, "gap_from_image", -1, minimum=-1),
+        "block_spacing": get_int(text_area, "block_spacing", -1, minimum=-1),
+        "multiline_spacing": get_int(text_area, "multiline_spacing", -1, minimum=-1),
+        "extra_width": get_int(canvas_extra, "width", -1, minimum=-1),
+        "extra_height": get_int(canvas_extra, "height", -1, minimum=-1),
+        "title_size": get_int(title, "size", -1, minimum=-1),
+        "title_min_size": get_int(title, "min_size", -1, minimum=-1),
+        "subtitle_size": get_int(subtitle, "size", -1, minimum=-1),
+        "subtitle_min_size": get_int(subtitle, "min_size", -1, minimum=-1),
+        "font_name": get_primary_font_name(template),
+    }
 
 def get_int(data: dict[str, Any], key: str, default: int, minimum: int = 0) -> int:
     value = data.get(key, default)
@@ -471,7 +535,6 @@ def ensure_template_fonts_available() -> None:
 
 
 def get_available_font_names() -> tuple[str, ...]:
-    ensure_template_fonts_available()
     FONTS_DIR.mkdir(parents=True, exist_ok=True)
 
     font_names = sorted({path.name for path in FONTS_DIR.glob("*.ttf") if path.is_file()})
@@ -844,32 +907,35 @@ class ArtemKo7vMememizatorSettings:
 
     @classmethod
     def INPUT_TYPES(cls):
+        defaults = get_settings_defaults()
         return {
             "required": {
-                "background": ("STRING", {"default": "", "multiline": False}),
-                "text": ("STRING", {"default": "", "multiline": False}),
-                "padding_x": ("INT", {"default": -1, "min": -1, "max": 8192}),
-                "padding_y": ("INT", {"default": -1, "min": -1, "max": 8192}),
-                "frame_color": ("STRING", {"default": "", "multiline": False}),
-                "frame_gap": ("INT", {"default": -1, "min": -1, "max": 8192}),
-                "frame_thickness": ("INT", {"default": -1, "min": -1, "max": 8192}),
-                "text_padding_x": ("INT", {"default": -1, "min": -1, "max": 8192}),
-                "text_padding_bottom": ("INT", {"default": -1, "min": -1, "max": 8192}),
-                "gap_from_image": ("INT", {"default": -1, "min": -1, "max": 8192}),
-                "block_spacing": ("INT", {"default": -1, "min": -1, "max": 8192}),
-                "multiline_spacing": ("INT", {"default": -1, "min": -1, "max": 8192}),
-                "extra_width": ("INT", {"default": -1, "min": -1, "max": 8192}),
-                "extra_height": ("INT", {"default": -1, "min": -1, "max": 8192}),
-                "title_size": ("INT", {"default": -1, "min": -1, "max": 8192}),
-                "title_min_size": ("INT", {"default": -1, "min": -1, "max": 8192}),
-                "subtitle_size": ("INT", {"default": -1, "min": -1, "max": 8192}),
-                "subtitle_min_size": ("INT", {"default": -1, "min": -1, "max": 8192}),
+                "template_name": (get_template_names(),),
+                "background": ("STRING", {"default": defaults["background"], "multiline": False}),
+                "text": ("STRING", {"default": defaults["text"], "multiline": False}),
+                "padding_x": ("INT", {"default": defaults["padding_x"], "min": -1, "max": 8192}),
+                "padding_y": ("INT", {"default": defaults["padding_y"], "min": -1, "max": 8192}),
+                "frame_color": ("STRING", {"default": defaults["frame_color"], "multiline": False}),
+                "frame_gap": ("INT", {"default": defaults["frame_gap"], "min": -1, "max": 8192}),
+                "frame_thickness": ("INT", {"default": defaults["frame_thickness"], "min": -1, "max": 8192}),
+                "text_padding_x": ("INT", {"default": defaults["text_padding_x"], "min": -1, "max": 8192}),
+                "text_padding_bottom": ("INT", {"default": defaults["text_padding_bottom"], "min": -1, "max": 8192}),
+                "gap_from_image": ("INT", {"default": defaults["gap_from_image"], "min": -1, "max": 8192}),
+                "block_spacing": ("INT", {"default": defaults["block_spacing"], "min": -1, "max": 8192}),
+                "multiline_spacing": ("INT", {"default": defaults["multiline_spacing"], "min": -1, "max": 8192}),
+                "extra_width": ("INT", {"default": defaults["extra_width"], "min": -1, "max": 8192}),
+                "extra_height": ("INT", {"default": defaults["extra_height"], "min": -1, "max": 8192}),
+                "title_size": ("INT", {"default": defaults["title_size"], "min": -1, "max": 8192}),
+                "title_min_size": ("INT", {"default": defaults["title_min_size"], "min": -1, "max": 8192}),
+                "subtitle_size": ("INT", {"default": defaults["subtitle_size"], "min": -1, "max": 8192}),
+                "subtitle_min_size": ("INT", {"default": defaults["subtitle_min_size"], "min": -1, "max": 8192}),
                 "font_name": (get_settings_font_options(),),
             }
         }
 
     def build_settings(
         self,
+        template_name,
         background,
         text,
         padding_x,
@@ -892,6 +958,7 @@ class ArtemKo7vMememizatorSettings:
     ):
         return (
             {
+                "template_name": template_name,
                 "background": background,
                 "text": text,
                 "padding_x": padding_x,
@@ -913,7 +980,6 @@ class ArtemKo7vMememizatorSettings:
                 "font_name": font_name,
             },
         )
-
 
 class ArtemKo7vMememizator:
     CATEGORY = "ArtemKo7v"
@@ -968,4 +1034,3 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ArtemKo7vMememizator": "Mememizator",
     "ArtemKo7vMememizatorSettings": "Mememizator Settings",
 }
-
