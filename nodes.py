@@ -30,6 +30,7 @@ FONTS_DIR = CONFIG_DIR / "fonts"
 PACKAGE_CONFIG_PATH = BASE_DIR / "config.json"
 SETTINGS_TYPE = "MEMEMIZATOR_SETTINGS"
 TEMPLATE_DEFAULT_FONT = "(template default)"
+TEXT_POSITION_OPTIONS = ("below", "above", "overlay")
 LEGACY_DEMOTIVATOR_FONT_CANDIDATES = [
     "times.ttf",
     "Times New Roman.ttf",
@@ -64,6 +65,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
                 "gap_from_image": 20,
                 "block_spacing": 8,
                 "multiline_spacing": 4,
+                "position": "below",
+            },
+            "text_outline": {
+                "color": "#000000",
+                "thickness": 0,
             },
             "font": {
                 "font_candidates": [
@@ -303,6 +309,14 @@ def get_primary_font_name(template: dict[str, Any]) -> str:
     return TEMPLATE_DEFAULT_FONT
 
 
+def get_text_position_value(template: dict[str, Any]) -> str:
+    text_area = template.get("text_area", {})
+    value = normalize_optional_string(text_area.get("position"))
+    if value in TEXT_POSITION_OPTIONS:
+        return value
+    return "below"
+
+
 def get_settings_defaults(template_name: str | None = None) -> dict[str, Any]:
     template = get_template_config(template_name or get_first_template_name())
     image_offset = template.get("image_offset", {})
@@ -324,6 +338,7 @@ def get_settings_defaults(template_name: str | None = None) -> dict[str, Any]:
         "frame_thickness": get_int(frame, "thickness", -1, minimum=-1),
         "text_padding_x": get_int(text_area, "padding_x", -1, minimum=-1),
         "text_padding_bottom": get_int(text_area, "padding_bottom", -1, minimum=-1),
+        "text_position": get_text_position_value(template),
         "outline_color": str(text_outline.get("color", "#000000")),
         "outline_thickness": get_int(text_outline, "thickness", -1, minimum=-1),
         "gap_from_image": get_int(text_area, "gap_from_image", -1, minimum=-1),
@@ -642,6 +657,9 @@ def apply_settings_override(template: dict[str, Any], settings: Any) -> dict[str
     apply_int_override(frame, "thickness", settings.get("frame_thickness"))
     apply_int_override(text_area, "padding_x", settings.get("text_padding_x"))
     apply_int_override(text_area, "padding_bottom", settings.get("text_padding_bottom"))
+    text_position = normalize_optional_string(settings.get("text_position"))
+    if text_position in TEXT_POSITION_OPTIONS:
+        text_area["position"] = text_position
     apply_string_override(text_outline, "color", settings.get("outline_color"))
     apply_int_override(text_outline, "thickness", settings.get("outline_thickness"))
     apply_int_override(text_area, "gap_from_image", settings.get("gap_from_image"))
@@ -662,7 +680,7 @@ def apply_settings_override(template: dict[str, Any], settings: Any) -> dict[str
     return result
 
 
-def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: str, canvas_width: int, available_height: int) -> dict[str, Any]:
+def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: str, available_width: int, available_height: int) -> dict[str, Any]:
     text_area = template.get("text_area", {})
     text_outline = template.get("text_outline", {})
     shared_font_config = template.get("font", {})
@@ -670,7 +688,7 @@ def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: st
     subtitle_config = template.get("subtitle", {})
 
     padding_x = get_int(text_area, "padding_x", 20, minimum=0)
-    max_width = max(1, canvas_width - (padding_x * 2))
+    max_width = max(1, available_width - (padding_x * 2))
     block_spacing = get_int(text_area, "block_spacing", 8, minimum=0)
     multiline_spacing = get_int(text_area, "multiline_spacing", 4, minimum=0)
     outline_thickness = get_int(text_outline, "thickness", 0, minimum=0)
@@ -770,12 +788,12 @@ def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: st
     }
 
 
-def draw_centered_text(draw, canvas_width: int, y: int, text: str, font, fill: tuple[int, int, int], bbox: tuple[int, int, int, int], multiline_spacing: int, outline_thickness: int, outline_color: tuple[int, int, int]) -> None:
+def draw_centered_text(draw, region_x: int, region_width: int, y: int, text: str, font, fill: tuple[int, int, int], bbox: tuple[int, int, int, int], multiline_spacing: int, outline_thickness: int, outline_color: tuple[int, int, int]) -> None:
     if not text:
         return
 
     width = bbox[2] - bbox[0]
-    x = int(round((canvas_width - width) / 2 - bbox[0]))
+    x = int(round(region_x + (region_width - width) / 2 - bbox[0]))
     adjusted_y = int(round(y - bbox[1]))
     draw.multiline_text(
         (x, adjusted_y),
@@ -787,6 +805,77 @@ def draw_centered_text(draw, canvas_width: int, y: int, text: str, font, fill: t
         stroke_width=max(0, outline_thickness),
         stroke_fill=outline_color,
     )
+
+
+def get_layout_total_height(layout: dict[str, Any]) -> int:
+    title_layout = layout["title"]
+    subtitle_layout = layout["subtitle"]
+
+    total_text_height = 0
+    if title_layout["text"]:
+        total_text_height += title_layout["height"]
+    if subtitle_layout["text"]:
+        if total_text_height > 0:
+            total_text_height += layout["block_spacing"]
+        total_text_height += subtitle_layout["height"]
+
+    return total_text_height
+
+
+def get_text_region(template: dict[str, Any], canvas_width: int, canvas_height: int, image_x: int, image_y: int, source_width: int, source_height: int) -> dict[str, Any]:
+    text_area = template.get("text_area", {})
+    text_position = get_text_position_value(template)
+    gap_from_image = get_int(text_area, "gap_from_image", 20, minimum=0)
+    padding_bottom = get_int(text_area, "padding_bottom", 16, minimum=0)
+
+    overlay_region = {
+        "region_x": image_x,
+        "region_width": source_width,
+        "text_start_y": image_y + padding_bottom,
+        "available_text_height": max(1, source_height - (padding_bottom * 2)),
+        "vertical_anchor": "center",
+    }
+
+    if text_position == "overlay":
+        return overlay_region
+
+    if text_position == "above":
+        available_text_height = image_y - gap_from_image - padding_bottom
+        if available_text_height <= 1:
+            fallback = overlay_region.copy()
+            fallback["vertical_anchor"] = "top"
+            return fallback
+
+        return {
+            "region_x": 0,
+            "region_width": canvas_width,
+            "text_start_y": padding_bottom,
+            "available_text_height": max(1, available_text_height),
+            "vertical_anchor": "center",
+        }
+
+    available_text_height = canvas_height - (image_y + source_height + gap_from_image) - padding_bottom
+    if available_text_height <= 1:
+        fallback = overlay_region.copy()
+        fallback["vertical_anchor"] = "bottom"
+        return fallback
+
+    return {
+        "region_x": 0,
+        "region_width": canvas_width,
+        "text_start_y": image_y + source_height + gap_from_image,
+        "available_text_height": max(1, available_text_height),
+        "vertical_anchor": "center",
+    }
+
+
+def get_text_block_start(region_start_y: int, available_height: int, total_text_height: int, vertical_anchor: str) -> int:
+    free_space = max(0, available_height - total_text_height)
+    if vertical_anchor == "top":
+        return region_start_y
+    if vertical_anchor == "bottom":
+        return region_start_y + free_space
+    return region_start_y + (free_space // 2)
 
 
 def tensor_to_pil(image_tensor):
@@ -827,19 +916,16 @@ def render_classic_demotivator(image, template: dict[str, Any], title: str, subt
     canvas_extra = template.get("canvas_extra", {})
     image_offset = template.get("image_offset", {})
     frame = template.get("frame", {})
-    text_area = template.get("text_area", {})
 
     image_x = get_int(image_offset, "x", 20, minimum=0)
     image_y = get_int(image_offset, "y", 20, minimum=0)
     frame_gap = get_int(frame, "gap", 1, minimum=0)
     frame_thickness = get_int(frame, "thickness", 1, minimum=0)
-    gap_from_image = get_int(text_area, "gap_from_image", 20, minimum=0)
-    padding_bottom = get_int(text_area, "padding_bottom", 16, minimum=0)
     extra_width = get_int(canvas_extra, "width", 40, minimum=0)
     extra_height = get_int(canvas_extra, "height", 140, minimum=0)
 
     minimum_width = image_x + source_width + frame_gap + frame_thickness
-    minimum_height = image_y + source_height + gap_from_image + padding_bottom + 1
+    minimum_height = image_y + source_height + 1
     canvas_width = max(source_width + extra_width, minimum_width)
     canvas_height = max(source_height + extra_height, minimum_height)
     background_color = get_color(template.get("background_color"), "#000000")
@@ -866,25 +952,25 @@ def render_classic_demotivator(image, template: dict[str, Any], title: str, subt
                 outline=frame_color,
             )
 
-    text_start_y = image_y + source_height + gap_from_image
-    available_text_height = max(1, canvas_height - text_start_y - padding_bottom)
-    layout = resolve_text_layout(draw, template, title, subtitle, canvas_width, available_text_height)
+    region = get_text_region(template, canvas_width, canvas_height, image_x, image_y, source_width, source_height)
+    region_x = region["region_x"]
+    region_width = region["region_width"]
+    text_start_y = region["text_start_y"]
+    available_text_height = region["available_text_height"]
+    vertical_anchor = region["vertical_anchor"]
+
+    layout = resolve_text_layout(draw, template, title, subtitle, region_width, available_text_height)
+    total_text_height = get_layout_total_height(layout)
 
     title_layout = layout["title"]
     subtitle_layout = layout["subtitle"]
-    total_text_height = 0
-    if title_layout["text"]:
-        total_text_height += title_layout["height"]
-    if subtitle_layout["text"]:
-        if total_text_height > 0:
-            total_text_height += layout["block_spacing"]
-        total_text_height += subtitle_layout["height"]
+    current_y = get_text_block_start(text_start_y, available_text_height, total_text_height, vertical_anchor)
 
-    current_y = text_start_y + max(0, (available_text_height - total_text_height) // 2)
     if title_layout["text"]:
         draw_centered_text(
             draw,
-            canvas_width,
+            region_x,
+            region_width,
             current_y,
             title_layout["text"],
             title_layout["font"],
@@ -901,7 +987,8 @@ def render_classic_demotivator(image, template: dict[str, Any], title: str, subt
             current_y += layout["block_spacing"]
         draw_centered_text(
             draw,
-            canvas_width,
+            region_x,
+            region_width,
             current_y,
             subtitle_layout["text"],
             subtitle_layout["font"],
@@ -944,6 +1031,7 @@ class ArtemKo7vMememizatorSettings:
                 "frame_thickness": ("INT", {"default": defaults["frame_thickness"], "min": -1, "max": 8192}),
                 "text_padding_x": ("INT", {"default": defaults["text_padding_x"], "min": -1, "max": 8192}),
                 "text_padding_bottom": ("INT", {"default": defaults["text_padding_bottom"], "min": -1, "max": 8192}),
+                "text_position": (TEXT_POSITION_OPTIONS,),
                 "outline_color": ("STRING", {"default": defaults["outline_color"], "multiline": False}),
                 "outline_thickness": ("INT", {"default": defaults["outline_thickness"], "min": -1, "max": 8192}),
                 "gap_from_image": ("INT", {"default": defaults["gap_from_image"], "min": -1, "max": 8192}),
@@ -971,6 +1059,7 @@ class ArtemKo7vMememizatorSettings:
         frame_thickness,
         text_padding_x,
         text_padding_bottom,
+        text_position,
         outline_color,
         outline_thickness,
         gap_from_image,
@@ -996,6 +1085,7 @@ class ArtemKo7vMememizatorSettings:
                 "frame_thickness": frame_thickness,
                 "text_padding_x": text_padding_x,
                 "text_padding_bottom": text_padding_bottom,
+                "text_position": text_position,
                 "outline_color": outline_color,
                 "outline_thickness": outline_thickness,
                 "gap_from_image": gap_from_image,

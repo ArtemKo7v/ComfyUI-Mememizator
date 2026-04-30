@@ -65,6 +65,7 @@ function getTemplateWidgetValues(template, fontOptions) {
     frame_thickness: frame.thickness ?? -1,
     text_padding_x: textArea.padding_x ?? -1,
     text_padding_bottom: textArea.padding_bottom ?? -1,
+    text_position: textArea.position ?? "below",
     outline_color: textOutline.color ?? "#000000",
     outline_thickness: textOutline.thickness ?? -1,
     gap_from_image: textArea.gap_from_image ?? -1,
