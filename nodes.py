@@ -1,7 +1,10 @@
-import copy
+﻿import copy
 import json
 import os
 import shutil
+import urllib.request
+import zipfile
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +13,16 @@ BASE_DIR = Path(__file__).resolve().parent
 USER_DIR = Path(os.getcwd()) / "user" / "default"
 CONFIG_DIR = USER_DIR / "ComfyUI-Mememizator"
 CONFIG_PATH = CONFIG_DIR / "config.json"
+FONTS_DIR = CONFIG_DIR / "fonts"
 PACKAGE_CONFIG_PATH = BASE_DIR / "config.json"
+LEGACY_DEMOTIVATOR_FONT_CANDIDATES = [
+    "times.ttf",
+    "Times New Roman.ttf",
+    "times new roman.ttf",
+    "DejaVuSerif.ttf",
+    "LiberationSerif-Regular.ttf",
+    "NotoSerif-Regular.ttf",
+]
 DEFAULT_CONFIG: dict[str, Any] = {
     "templates": [
         {
@@ -38,33 +50,28 @@ DEFAULT_CONFIG: dict[str, Any] = {
                 "block_spacing": 8,
                 "multiline_spacing": 4,
             },
+            "font": {
+                "font_candidates": [
+                    "TR Impact.ttf",
+                ],
+                "download": {
+                    "url": "https://font.download/dl/font/tr-impact.zip",
+                    "target_file": "TR Impact.ttf",
+                    "archive_member": "TR Impact.ttf",
+                },
+            },
             "title": {
                 "size": 128,
                 "min_size": 64,
-                "font_candidates": [
-                    "times.ttf",
-                    "Times New Roman.ttf",
-                    "times new roman.ttf",
-                    "DejaVuSerif.ttf",
-                    "LiberationSerif-Regular.ttf",
-                    "NotoSerif-Regular.ttf",
-                ],
             },
             "subtitle": {
                 "size": 64,
                 "min_size": 32,
-                "font_candidates": [
-                    "times.ttf",
-                    "Times New Roman.ttf",
-                    "times new roman.ttf",
-                    "DejaVuSerif.ttf",
-                    "LiberationSerif-Regular.ttf",
-                    "NotoSerif-Regular.ttf",
-                ],
             },
         }
     ]
 }
+ATTEMPTED_FONT_DOWNLOADS: set[str] = set()
 
 
 def log(message: str) -> None:
@@ -72,7 +79,7 @@ def log(message: str) -> None:
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    with path.open("r", encoding="utf-8") as file:
+    with path.open("r", encoding="utf-8-sig") as file:
         return json.load(file)
 
 
@@ -119,6 +126,20 @@ def deep_copy_config(data: dict[str, Any]) -> dict[str, Any]:
     return copy.deepcopy(data)
 
 
+def deep_merge_dicts(base: Any, override: Any) -> Any:
+    if not isinstance(base, dict) or not isinstance(override, dict):
+        return copy.deepcopy(override)
+
+    merged = copy.deepcopy(base)
+    for key, value in override.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = deep_merge_dicts(merged[key], value)
+        else:
+            merged[key] = copy.deepcopy(value)
+
+    return merged
+
+
 def load_packaged_default_config() -> dict[str, Any]:
     if PACKAGE_CONFIG_PATH.exists():
         try:
@@ -129,9 +150,31 @@ def load_packaged_default_config() -> dict[str, Any]:
     return deep_copy_config(DEFAULT_CONFIG)
 
 
+def upgrade_legacy_template(template: dict[str, Any]) -> dict[str, Any]:
+    upgraded = copy.deepcopy(template)
+    if upgraded.get("name") != "Classic Demotivator":
+        return upgraded
+
+    for section_name in ("title", "subtitle"):
+        section = upgraded.get(section_name)
+        if not isinstance(section, dict):
+            continue
+
+        candidates = section.get("font_candidates")
+        if candidates == LEGACY_DEMOTIVATOR_FONT_CANDIDATES:
+            section.pop("font_candidates", None)
+
+    return upgraded
+
+
 def normalize_config(config: Any) -> dict[str, Any]:
     default_config = load_packaged_default_config()
     normalized = deep_copy_config(default_config)
+    default_templates = {
+        template["name"]: template
+        for template in default_config.get("templates", [])
+        if isinstance(template, dict) and isinstance(template.get("name"), str)
+    }
 
     if not isinstance(config, dict):
         return normalized
@@ -152,7 +195,13 @@ def normalize_config(config: Any) -> dict[str, Any]:
         if not isinstance(template_type, str) or not template_type.strip():
             continue
 
-        valid_templates.append(template)
+        default_template = default_templates.get(name)
+        if isinstance(default_template, dict):
+            merged_template = deep_merge_dicts(default_template, template)
+        else:
+            merged_template = copy.deepcopy(template)
+
+        valid_templates.append(upgrade_legacy_template(merged_template))
 
     if valid_templates:
         normalized["templates"] = valid_templates
@@ -250,6 +299,26 @@ def normalize_text(value: Any) -> str:
     return "\n".join(lines).strip()
 
 
+def get_font_candidates(font_config: Any) -> list[str]:
+    if not isinstance(font_config, dict):
+        return []
+
+    candidates = font_config.get("font_candidates", [])
+    if isinstance(candidates, str):
+        return [candidates]
+    if isinstance(candidates, list):
+        return [candidate for candidate in candidates if isinstance(candidate, str) and candidate.strip()]
+    return []
+
+
+def extract_download_config(font_config: Any) -> dict[str, Any]:
+    if not isinstance(font_config, dict):
+        return {}
+
+    download = font_config.get("download", {})
+    return download if isinstance(download, dict) else {}
+
+
 def iter_font_candidates(candidates: list[str] | tuple[str, ...] | str | Any) -> list[Path]:
     if isinstance(candidates, str):
         candidates = [candidates]
@@ -258,6 +327,8 @@ def iter_font_candidates(candidates: list[str] | tuple[str, ...] | str | Any) ->
 
     common_dirs = [
         BASE_DIR,
+        CONFIG_DIR,
+        FONTS_DIR,
         Path.cwd(),
         Path("C:/Windows/Fonts"),
         Path("/usr/share/fonts"),
@@ -292,8 +363,97 @@ def iter_font_candidates(candidates: list[str] | tuple[str, ...] | str | Any) ->
     return resolved
 
 
-def load_font(font_candidates: list[str] | tuple[str, ...], size: int):
+def extract_font_from_zip(zip_bytes: bytes, destination_dir: Path, target_file: str, archive_member: str | None = None) -> bool:
+    destination_dir.mkdir(parents=True, exist_ok=True)
+
+    with zipfile.ZipFile(BytesIO(zip_bytes)) as archive:
+        font_members = [
+            member
+            for member in archive.namelist()
+            if not member.endswith("/") and Path(member).suffix.lower() in {".ttf", ".otf"}
+        ]
+        if not font_members:
+            return False
+
+        selected_member = None
+        if isinstance(archive_member, str) and archive_member.strip():
+            wanted_name = Path(archive_member).name.lower()
+            for member in font_members:
+                if Path(member).name.lower() == wanted_name:
+                    selected_member = member
+                    break
+
+        if selected_member is None:
+            target_name = Path(target_file).name.lower()
+            for member in font_members:
+                if Path(member).name.lower() == target_name:
+                    selected_member = member
+                    break
+
+        if selected_member is None:
+            selected_member = font_members[0]
+
+        extracted_bytes = archive.read(selected_member)
+        output_path = destination_dir / target_file
+        output_path.write_bytes(extracted_bytes)
+        return output_path.is_file()
+
+
+def download_font_assets(font_config: Any) -> None:
+    candidates = get_font_candidates(font_config)
+    if iter_font_candidates(candidates):
+        return
+
+    download_config = extract_download_config(font_config)
+    download_url = download_config.get("url")
+    target_file = download_config.get("target_file")
+    archive_member = download_config.get("archive_member")
+
+    if not isinstance(download_url, str) or not download_url.strip():
+        return
+    if not isinstance(target_file, str) or not target_file.strip():
+        if candidates:
+            target_file = Path(candidates[0]).name
+        else:
+            return
+
+    attempt_key = f"{download_url}|{target_file}"
+    if attempt_key in ATTEMPTED_FONT_DOWNLOADS:
+        return
+    ATTEMPTED_FONT_DOWNLOADS.add(attempt_key)
+
+    FONTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    try:
+        request = urllib.request.Request(
+            download_url,
+            headers={"User-Agent": "ComfyUI-Mememizator/0.0.1"},
+        )
+        with urllib.request.urlopen(request, timeout=30) as response:
+            payload = response.read()
+    except Exception as exc:
+        log(f"Failed to download font from {download_url}: {exc}")
+        return
+
+    try:
+        if download_url.lower().endswith(".zip"):
+            if extract_font_from_zip(payload, FONTS_DIR, target_file, archive_member if isinstance(archive_member, str) else None):
+                log(f"Downloaded font {target_file} to {FONTS_DIR}")
+            else:
+                log(f"Downloaded archive from {download_url}, but no font file was found inside")
+            return
+
+        output_path = FONTS_DIR / target_file
+        output_path.write_bytes(payload)
+        log(f"Downloaded font {target_file} to {FONTS_DIR}")
+    except Exception as exc:
+        log(f"Failed to save font {target_file}: {exc}")
+
+
+def load_font(font_config: Any, size: int):
     _, _, _, ImageFont = require_pillow()
+    download_font_assets(font_config)
+    font_candidates = get_font_candidates(font_config)
 
     for candidate in iter_font_candidates(font_candidates):
         try:
@@ -320,23 +480,24 @@ def measure_text(draw, text: str, font, multiline_spacing: int) -> tuple[int, in
     return width, height, bbox
 
 
-def fit_font(draw, text: str, font_candidates: list[str] | tuple[str, ...], size: int, min_size: int, max_width: int, multiline_spacing: int):
+def fit_font(draw, text: str, font_config: Any, size: int, min_size: int, max_width: int, multiline_spacing: int):
     current_size = max(min_size, size)
 
     while current_size >= min_size:
-        font = load_font(font_candidates, current_size)
+        font = load_font(font_config, current_size)
         width, height, bbox = measure_text(draw, text, font, multiline_spacing)
         if not text or width <= max_width:
             return font, width, height, bbox, current_size
         current_size -= 1
 
-    font = load_font(font_candidates, min_size)
+    font = load_font(font_config, min_size)
     width, height, bbox = measure_text(draw, text, font, multiline_spacing)
     return font, width, height, bbox, min_size
 
 
 def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: str, canvas_width: int, available_height: int) -> dict[str, Any]:
     text_area = template.get("text_area", {})
+    shared_font_config = template.get("font", {})
     title_config = template.get("title", {})
     subtitle_config = template.get("subtitle", {})
 
@@ -349,13 +510,14 @@ def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: st
     subtitle_size = get_int(subtitle_config, "size", 32, minimum=1)
     title_min_size = get_int(title_config, "min_size", 18, minimum=1)
     subtitle_min_size = get_int(subtitle_config, "min_size", 16, minimum=1)
-    title_candidates = title_config.get("font_candidates", [])
-    subtitle_candidates = subtitle_config.get("font_candidates", [])
+
+    title_font_config = deep_merge_dicts(shared_font_config, title_config) if isinstance(shared_font_config, dict) else title_config
+    subtitle_font_config = deep_merge_dicts(shared_font_config, subtitle_config) if isinstance(shared_font_config, dict) else subtitle_config
 
     title_font, title_width, title_height, title_bbox, title_size = fit_font(
         draw,
         title,
-        title_candidates,
+        title_font_config,
         title_size,
         title_min_size,
         max_width,
@@ -364,7 +526,7 @@ def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: st
     subtitle_font, subtitle_width, subtitle_height, subtitle_bbox, subtitle_size = fit_font(
         draw,
         subtitle,
-        subtitle_candidates,
+        subtitle_font_config,
         subtitle_size,
         subtitle_min_size,
         max_width,
@@ -388,7 +550,7 @@ def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: st
             subtitle_font, subtitle_width, subtitle_height, subtitle_bbox, subtitle_size = fit_font(
                 draw,
                 subtitle,
-                subtitle_candidates,
+                subtitle_font_config,
                 subtitle_size,
                 subtitle_min_size,
                 max_width,
@@ -401,7 +563,7 @@ def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: st
             title_font, title_width, title_height, title_bbox, title_size = fit_font(
                 draw,
                 title,
-                title_candidates,
+                title_font_config,
                 title_size,
                 title_min_size,
                 max_width,
@@ -626,3 +788,4 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "ArtemKo7vMememizator": "Mememizator",
 }
+
