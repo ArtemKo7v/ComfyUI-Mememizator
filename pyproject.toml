@@ -2,7 +2,7 @@
 [project]
 name = "comfyui-mememizator"
 description = "ComfyUI node to make memes and demotivators"
-version = "0.0.1"
+version = "0.0.2"
 license = { text = "MIT" }
 dependencies = [
   "numpy>=1.24.0",
