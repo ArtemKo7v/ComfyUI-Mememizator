@@ -1,0 +1,54 @@
+{
+  "templates": [
+    {
+      "name": "Classic Demotivator",
+      "type": "classic_demotivator",
+      "background_color": "#000000",
+      "text_color": "#FFFFFF",
+      "canvas_extra": {
+        "width": 40,
+        "height": 140
+      },
+      "image_offset": {
+        "x": 20,
+        "y": 20
+      },
+      "frame": {
+        "color": "#FFFFFF",
+        "gap": 1,
+        "thickness": 1
+      },
+      "text_area": {
+        "padding_x": 20,
+        "padding_bottom": 16,
+        "gap_from_image": 20,
+        "block_spacing": 8,
+        "multiline_spacing": 4
+      },
+      "title": {
+        "size": 40,
+        "min_size": 18,
+        "font_candidates": [
+          "times.ttf",
+          "Times New Roman.ttf",
+          "times new roman.ttf",
+          "DejaVuSerif.ttf",
+          "LiberationSerif-Regular.ttf",
+          "NotoSerif-Regular.ttf"
+        ]
+      },
+      "subtitle": {
+        "size": 32,
+        "min_size": 16,
+        "font_candidates": [
+          "times.ttf",
+          "Times New Roman.ttf",
+          "times new roman.ttf",
+          "DejaVuSerif.ttf",
+          "LiberationSerif-Regular.ttf",
+          "NotoSerif-Regular.ttf"
+        ]
+      }
+    }
+  ]
+}

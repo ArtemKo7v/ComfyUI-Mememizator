@@ -1,0 +1,17 @@
+# pyproject.toml
+[project]
+name = "comfyui-mememizator"
+description = "ComfyUI node to make memes and demotivators"
+version = "0.0.1"
+license = { text = "MIT" }
+dependencies = [
+  "numpy>=1.24.0",
+  "pillow>=10.0.0",
+]
+
+[project.urls]
+Repository = "https://github.com/ArtemKo7v/ComfyUI-Mememizator"
+
+[tool.comfy]
+PublisherId = "artemko7v"
+DisplayName = "ComfyUI node to make memes and demotivators."
