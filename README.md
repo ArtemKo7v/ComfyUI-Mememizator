@@ -3,13 +3,7 @@ ComfyUI node to make memes and demotivators.
 
 ## Configuration
 
-The default template config is stored in the repository at:
-
-```text
-ComfyUI/custom_nodes/ComfyUI-Mememizator/config.json
-```
-
-On first launch it is copied to:
+On first launch the config file will be saved to:
 
 ```text
 ComfyUI/user/default/ComfyUI-Mememizator/config.json
@@ -27,7 +21,7 @@ For `Classic Demotivator`, the node expects `TR Impact.ttf` and downloads it fro
 https://font.download/dl/font/tr-impact.zip
 ```
 
-`ArtemKo7vMememizatorSettings` builds UI overrides for the main meme node. Connect it to the optional `settings` input on `ArtemKo7vMememizator` to override config values without editing JSON.
+`MememizatorSettings` node builds UI overrides for the main meme node. Connect it to the optional `settings` input on `Mememizator` node to override config values without editing JSON.
 
 The settings node also includes a `template_name` dropdown. On the client side, it loads the current config and fills the other fields from the selected template.
 
