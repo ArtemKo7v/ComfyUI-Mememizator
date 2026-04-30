@@ -28,8 +28,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
             },
             "frame": {
                 "color": "#FFFFFF",
-                "gap": 1,
-                "thickness": 1,
+                "gap": 4,
+                "thickness": 2,
             },
             "text_area": {
                 "padding_x": 20,
@@ -39,8 +39,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
                 "multiline_spacing": 4,
             },
             "title": {
-                "size": 40,
-                "min_size": 18,
+                "size": 128,
+                "min_size": 64,
                 "font_candidates": [
                     "times.ttf",
                     "Times New Roman.ttf",
@@ -51,8 +51,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
                 ],
             },
             "subtitle": {
-                "size": 32,
-                "min_size": 16,
+                "size": 64,
+                "min_size": 32,
                 "font_candidates": [
                     "times.ttf",
                     "Times New Roman.ttf",
