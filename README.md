@@ -32,4 +32,4 @@ are shown in the node dropdown. After changing the list of templates, restart Co
 
 ![Example](example/example.png)
 
-Workflow can be recreated from the screenshot above or imported directly from [example/workflow.json](example/workflow.json).
+Workflow can be used from the image above or imported directly from [example/workflow.json](example/workflow.json).
