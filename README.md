@@ -27,3 +27,9 @@ The settings node also includes a `template_name` dropdown. On the client side, 
 
 Edit the user config to add or change templates. Template names from `templates[].name`
 are shown in the node dropdown. After changing the list of templates, restart ComfyUI.
+
+## Example
+
+![Example](example/example.png)
+
+Workflow can be recreated from the screenshot above or imported directly from [example/workflow.json](example/workflow.json).
