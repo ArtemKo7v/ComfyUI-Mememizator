@@ -1,4 +1,4 @@
-﻿import copy
+import copy
 import json
 import os
 import shutil
@@ -15,6 +15,8 @@ CONFIG_DIR = USER_DIR / "ComfyUI-Mememizator"
 CONFIG_PATH = CONFIG_DIR / "config.json"
 FONTS_DIR = CONFIG_DIR / "fonts"
 PACKAGE_CONFIG_PATH = BASE_DIR / "config.json"
+SETTINGS_TYPE = "MEMEMIZATOR_SETTINGS"
+TEMPLATE_DEFAULT_FONT = "(template default)"
 LEGACY_DEMOTIVATOR_FONT_CANDIDATES = [
     "times.ttf",
     "Times New Roman.ttf",
@@ -299,6 +301,13 @@ def normalize_text(value: Any) -> str:
     return "\n".join(lines).strip()
 
 
+def normalize_optional_string(value: Any) -> str | None:
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    return text or None
+
 def get_font_candidates(font_config: Any) -> list[str]:
     if not isinstance(font_config, dict):
         return []
@@ -450,6 +459,41 @@ def download_font_assets(font_config: Any) -> None:
         log(f"Failed to save font {target_file}: {exc}")
 
 
+def ensure_template_fonts_available() -> None:
+    config = load_config()
+    for template in config.get("templates", []):
+        if not isinstance(template, dict):
+            continue
+
+        font_config = template.get("font")
+        if isinstance(font_config, dict):
+            download_font_assets(font_config)
+
+
+def get_available_font_names() -> tuple[str, ...]:
+    ensure_template_fonts_available()
+    FONTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    font_names = sorted({path.name for path in FONTS_DIR.glob("*.ttf") if path.is_file()})
+    if font_names:
+        return tuple(font_names)
+
+    fallback_names: set[str] = set()
+    for template in load_config().get("templates", []):
+        if not isinstance(template, dict):
+            continue
+        for key in ("font", "title", "subtitle"):
+            for candidate in get_font_candidates(template.get(key, {})):
+                if candidate.lower().endswith(".ttf"):
+                    fallback_names.add(Path(candidate).name)
+
+    return tuple(sorted(fallback_names))
+
+
+def get_settings_font_options() -> tuple[str, ...]:
+    return (TEMPLATE_DEFAULT_FONT, *get_available_font_names())
+
+
 def load_font(font_config: Any, size: int):
     _, _, _, ImageFont = require_pillow()
     download_font_assets(font_config)
@@ -493,6 +537,58 @@ def fit_font(draw, text: str, font_config: Any, size: int, min_size: int, max_wi
     font = load_font(font_config, min_size)
     width, height, bbox = measure_text(draw, text, font, multiline_spacing)
     return font, width, height, bbox, min_size
+
+
+def apply_int_override(target: dict[str, Any], key: str, value: Any) -> None:
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and int(value) >= 0:
+        target[key] = int(value)
+
+
+def apply_string_override(target: dict[str, Any], key: str, value: Any) -> None:
+    normalized = normalize_optional_string(value)
+    if normalized is not None:
+        target[key] = normalized
+
+
+def apply_settings_override(template: dict[str, Any], settings: Any) -> dict[str, Any]:
+    result = copy.deepcopy(template)
+    if not isinstance(settings, dict):
+        return result
+
+    apply_string_override(result, "background_color", settings.get("background"))
+    apply_string_override(result, "text_color", settings.get("text"))
+
+    image_offset = result.setdefault("image_offset", {})
+    frame = result.setdefault("frame", {})
+    text_area = result.setdefault("text_area", {})
+    canvas_extra = result.setdefault("canvas_extra", {})
+    title = result.setdefault("title", {})
+    subtitle = result.setdefault("subtitle", {})
+    font = result.setdefault("font", {})
+
+    apply_int_override(image_offset, "x", settings.get("padding_x"))
+    apply_int_override(image_offset, "y", settings.get("padding_y"))
+    apply_string_override(frame, "color", settings.get("frame_color"))
+    apply_int_override(frame, "gap", settings.get("frame_gap"))
+    apply_int_override(frame, "thickness", settings.get("frame_thickness"))
+    apply_int_override(text_area, "padding_x", settings.get("text_padding_x"))
+    apply_int_override(text_area, "padding_bottom", settings.get("text_padding_bottom"))
+    apply_int_override(text_area, "gap_from_image", settings.get("gap_from_image"))
+    apply_int_override(text_area, "block_spacing", settings.get("block_spacing"))
+    apply_int_override(text_area, "multiline_spacing", settings.get("multiline_spacing"))
+    apply_int_override(canvas_extra, "width", settings.get("extra_width"))
+    apply_int_override(canvas_extra, "height", settings.get("extra_height"))
+    apply_int_override(title, "size", settings.get("title_size"))
+    apply_int_override(title, "min_size", settings.get("title_min_size"))
+    apply_int_override(subtitle, "size", settings.get("subtitle_size"))
+    apply_int_override(subtitle, "min_size", settings.get("subtitle_min_size"))
+
+    font_name = normalize_optional_string(settings.get("font_name"))
+    if font_name and font_name != TEMPLATE_DEFAULT_FONT:
+        font["font_candidates"] = [font_name]
+        font["download"] = {}
+
+    return result
 
 
 def resolve_text_layout(draw, template: dict[str, Any], title: str, subtitle: str, canvas_width: int, available_height: int) -> dict[str, Any]:
@@ -740,6 +836,85 @@ def render_meme(image, template: dict[str, Any], title: str, subtitle: str):
     raise RuntimeError(f"Unsupported meme template type: {template_type}")
 
 
+class ArtemKo7vMememizatorSettings:
+    CATEGORY = "ArtemKo7v"
+    RETURN_TYPES = (SETTINGS_TYPE,)
+    RETURN_NAMES = ("settings",)
+    FUNCTION = "build_settings"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "background": ("STRING", {"default": "", "multiline": False}),
+                "text": ("STRING", {"default": "", "multiline": False}),
+                "padding_x": ("INT", {"default": -1, "min": -1, "max": 8192}),
+                "padding_y": ("INT", {"default": -1, "min": -1, "max": 8192}),
+                "frame_color": ("STRING", {"default": "", "multiline": False}),
+                "frame_gap": ("INT", {"default": -1, "min": -1, "max": 8192}),
+                "frame_thickness": ("INT", {"default": -1, "min": -1, "max": 8192}),
+                "text_padding_x": ("INT", {"default": -1, "min": -1, "max": 8192}),
+                "text_padding_bottom": ("INT", {"default": -1, "min": -1, "max": 8192}),
+                "gap_from_image": ("INT", {"default": -1, "min": -1, "max": 8192}),
+                "block_spacing": ("INT", {"default": -1, "min": -1, "max": 8192}),
+                "multiline_spacing": ("INT", {"default": -1, "min": -1, "max": 8192}),
+                "extra_width": ("INT", {"default": -1, "min": -1, "max": 8192}),
+                "extra_height": ("INT", {"default": -1, "min": -1, "max": 8192}),
+                "title_size": ("INT", {"default": -1, "min": -1, "max": 8192}),
+                "title_min_size": ("INT", {"default": -1, "min": -1, "max": 8192}),
+                "subtitle_size": ("INT", {"default": -1, "min": -1, "max": 8192}),
+                "subtitle_min_size": ("INT", {"default": -1, "min": -1, "max": 8192}),
+                "font_name": (get_settings_font_options(),),
+            }
+        }
+
+    def build_settings(
+        self,
+        background,
+        text,
+        padding_x,
+        padding_y,
+        frame_color,
+        frame_gap,
+        frame_thickness,
+        text_padding_x,
+        text_padding_bottom,
+        gap_from_image,
+        block_spacing,
+        multiline_spacing,
+        extra_width,
+        extra_height,
+        title_size,
+        title_min_size,
+        subtitle_size,
+        subtitle_min_size,
+        font_name,
+    ):
+        return (
+            {
+                "background": background,
+                "text": text,
+                "padding_x": padding_x,
+                "padding_y": padding_y,
+                "frame_color": frame_color,
+                "frame_gap": frame_gap,
+                "frame_thickness": frame_thickness,
+                "text_padding_x": text_padding_x,
+                "text_padding_bottom": text_padding_bottom,
+                "gap_from_image": gap_from_image,
+                "block_spacing": block_spacing,
+                "multiline_spacing": multiline_spacing,
+                "extra_width": extra_width,
+                "extra_height": extra_height,
+                "title_size": title_size,
+                "title_min_size": title_min_size,
+                "subtitle_size": subtitle_size,
+                "subtitle_min_size": subtitle_min_size,
+                "font_name": font_name,
+            },
+        )
+
+
 class ArtemKo7vMememizator:
     CATEGORY = "ArtemKo7v"
     RETURN_TYPES = ("IMAGE",)
@@ -754,15 +929,18 @@ class ArtemKo7vMememizator:
                 "template": (get_template_names(),),
                 "title": ("STRING", {"default": "", "multiline": False}),
                 "subtitle": ("STRING", {"default": "", "multiline": True}),
-            }
+            },
+            "optional": {
+                "settings": (SETTINGS_TYPE,),
+            },
         }
 
-    def mememizate(self, image, template, title, subtitle):
+    def mememizate(self, image, template, title, subtitle, settings=None):
         torch = require_torch()
 
         title_text = normalize_text(title)
         subtitle_text = normalize_text(subtitle)
-        template_config = get_template_config(template)
+        template_config = apply_settings_override(get_template_config(template), settings)
 
         if image.ndim == 3:
             single_image = tensor_to_pil(image)
@@ -783,9 +961,11 @@ class ArtemKo7vMememizator:
 
 NODE_CLASS_MAPPINGS = {
     "ArtemKo7vMememizator": ArtemKo7vMememizator,
+    "ArtemKo7vMememizatorSettings": ArtemKo7vMememizatorSettings,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "ArtemKo7vMememizator": "Mememizator",
+    "ArtemKo7vMememizatorSettings": "Mememizator Settings",
 }
 
