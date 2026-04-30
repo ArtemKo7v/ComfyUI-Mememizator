@@ -15,10 +15,10 @@ Fonts referenced by templates are downloaded to:
 ComfyUI/user/default/ComfyUI-Mememizator/fonts/
 ```
 
-For `Classic Demotivator`, the node expects `TR Impact.ttf` and downloads it from:
+For `Classic Demotivator`, the node expects `impact.ttf` and downloads it from:
 
 ```text
-https://font.download/dl/font/tr-impact.zip
+https://font.download/dl/font/impact.zip
 ```
 
 `MememizatorSettings` node builds UI overrides for the main meme node. Connect it to the optional `settings` input on `Mememizator` node to override config values without editing JSON.

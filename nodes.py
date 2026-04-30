@@ -73,12 +73,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
             },
             "font": {
                 "font_candidates": [
-                    "TR Impact.ttf",
+                    "impact.ttf",
                 ],
                 "download": {
-                    "url": "https://font.download/dl/font/tr-impact.zip",
-                    "target_file": "TR Impact.ttf",
-                    "archive_member": "TR Impact.ttf",
+                    "url": "https://font.download/dl/font/impact.zip",
+                    "target_file": "impact.ttf",
+                    "archive_member": "impact.ttf",
                 },
             },
             "title": {
