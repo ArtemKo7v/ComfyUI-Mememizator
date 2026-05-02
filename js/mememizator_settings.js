@@ -6,10 +6,12 @@ const TEMPLATE_DEFAULT_FONT = "(template default)";
 const CONFIG_ROUTE = "/artemko7v/mememizator/config";
 let templateMapPromise = null;
 
+// Finds a widget on a node by name.
 function findWidget(node, name) {
   return node.widgets?.find((widget) => widget.name === name);
 }
 
+// Sets a widget value when the widget exists.
 function setWidgetValue(node, name, value) {
   const widget = findWidget(node, name);
   if (!widget || value === undefined) {
@@ -18,6 +20,7 @@ function setWidgetValue(node, name, value) {
   widget.value = value;
 }
 
+// Loads the template map from the backend config route.
 async function loadTemplateMap() {
   if (!templateMapPromise) {
     templateMapPromise = api.fetchApi(CONFIG_ROUTE)
@@ -44,6 +47,7 @@ async function loadTemplateMap() {
   return templateMapPromise;
 }
 
+// Converts a template config into settings widget values.
 function getTemplateWidgetValues(template, fontOptions) {
   const imageOffset = template.image_offset ?? {};
   const frame = template.frame ?? {};
@@ -81,6 +85,7 @@ function getTemplateWidgetValues(template, fontOptions) {
   };
 }
 
+// Applies a selected template to a settings node.
 async function applyTemplateToNode(node, templateName) {
   const templateMap = await loadTemplateMap();
   const template = templateMap.get(templateName);
@@ -102,6 +107,7 @@ async function applyTemplateToNode(node, templateName) {
 
 app.registerExtension({
   name: "artemko7v.mememizator.settings-template-sync",
+  // Binds template synchronization when a settings node is created.
   async nodeCreated(node) {
     if (node.comfyClass !== NODE_CLASS || node.__mememizatorTemplateSyncBound) {
       return;
@@ -114,6 +120,7 @@ app.registerExtension({
     }
 
     const originalCallback = templateWidget.callback;
+    // Handles template widget changes and applies matching defaults.
     templateWidget.callback = async function (value, ...args) {
       if (originalCallback) {
         await originalCallback.call(this, value, ...args);
