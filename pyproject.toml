@@ -1,4 +1,7 @@
-# pyproject.toml
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "comfyui-mememizator"
 description = "ComfyUI node to make memes and demotivators"
@@ -15,3 +18,7 @@ Repository = "https://github.com/ArtemKo7v/ComfyUI-Mememizator"
 [tool.comfy]
 PublisherId = "artemko7v"
 DisplayName = "ComfyUI node to make memes and demotivators."
+
+[tool.setuptools]
+packages = ["mememizator"]
+py-modules = []
