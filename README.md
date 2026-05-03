@@ -30,8 +30,16 @@ The settings node also includes a `template_name` dropdown. On the client side, 
 Edit the user config to add or change templates. Template names from `templates[].name`
 are shown in the node dropdown. After changing the list of templates, restart ComfyUI.
 
+## Mememizator Combine Images
+
+`Mememizator Combine Images` combines up to four input images into a single frame. Use it before `Mememizator` to make memes that consist of several panels or sequential frames.
+
+The node supports `horizontal`, `vertical`, and `2x2` layouts, with optional maximum output size, background color, and padding settings.
+
+![Combine Images workflow](images/image02.png)
+
 ## Example
 
 ![Example](examples/example.png)
 
-Workflow can be used from the image above or downloaded from [examples/workflow_basic.json](examples/workflow_basic.json) or [examples/workflow_settings.json](examples/workflow_settings.json).
+Workflow can be used from the image above or downloaded from [examples/workflow_basic.json](examples/workflow_basic.json), [examples/workflow_settings.json](examples/workflow_settings.json), or [examples/workflow_combine.json](examples/workflow_combine.json).
