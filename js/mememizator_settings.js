@@ -56,6 +56,9 @@ function getTemplateWidgetValues(template, fontOptions) {
   const canvasExtra = template.canvas_extra ?? {};
   const title = template.title ?? {};
   const subtitle = template.subtitle ?? {};
+  const textLines = Array.isArray(template.text_lines) ? template.text_lines : [];
+  const firstLine = textLines[0] ?? title;
+  const secondLine = textLines[1] ?? subtitle;
   const fontCandidate = template.font?.font_candidates?.[0] ?? TEMPLATE_DEFAULT_FONT;
   const normalizedFont = fontOptions.includes(fontCandidate) ? fontCandidate : TEMPLATE_DEFAULT_FONT;
 
@@ -77,10 +80,10 @@ function getTemplateWidgetValues(template, fontOptions) {
     multiline_spacing: textArea.multiline_spacing ?? -1,
     extra_width: canvasExtra.width ?? -1,
     extra_height: canvasExtra.height ?? -1,
-    title_size: title.size ?? -1,
-    title_min_size: title.min_size ?? -1,
-    subtitle_size: subtitle.size ?? -1,
-    subtitle_min_size: subtitle.min_size ?? -1,
+    title_size: firstLine.size ?? -1,
+    title_min_size: firstLine.min_size ?? -1,
+    subtitle_size: secondLine.size ?? -1,
+    subtitle_min_size: secondLine.min_size ?? -1,
     font_name: normalizedFont,
   };
 }

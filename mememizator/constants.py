@@ -12,6 +12,8 @@ PACKAGE_CONFIG_PATH = BASE_DIR / "config.json"
 SETTINGS_TYPE = "MEMEMIZATOR_SETTINGS"
 TEMPLATE_DEFAULT_FONT = "(template default)"
 TEXT_POSITION_OPTIONS = ("below", "above", "overlay")
+TEXT_LINE_VERTICAL_POSITION_OPTIONS = ("top", "center", "bottom")
+TEXT_LINE_ALIGN_OPTIONS = ("left", "center", "right")
 LEGACY_DEMOTIVATOR_FONT_CANDIDATES = [
     "times.ttf",
     "Times New Roman.ttf",
@@ -70,6 +72,115 @@ DEFAULT_CONFIG: dict[str, Any] = {
                 "size": 64,
                 "min_size": 32,
             },
+            "text_lines": [
+                {
+                    "source": "title",
+                    "vertical_position": "center",
+                    "align": "center",
+                    "size": 128,
+                    "min_size": 64,
+                },
+                {
+                    "source": "subtitle",
+                    "vertical_position": "center",
+                    "align": "center",
+                    "size": 64,
+                    "min_size": 32,
+                },
+                {
+                    "source": "text_3",
+                    "vertical_position": "center",
+                    "align": "center",
+                    "size": 64,
+                    "min_size": 32,
+                },
+                {
+                    "source": "text_4",
+                    "vertical_position": "center",
+                    "align": "center",
+                    "size": 64,
+                    "min_size": 32,
+                },
+            ],
+        },
+        {
+            "name": "Classic Meme",
+            "type": "classic_meme",
+            "background_color": "#000000",
+            "text_color": "#FFFFFF",
+            "canvas_extra": {
+                "width": 0,
+                "height": 0,
+            },
+            "image_offset": {
+                "x": 0,
+                "y": 0,
+            },
+            "frame": {
+                "color": "#FFFFFF",
+                "gap": 0,
+                "thickness": 0,
+            },
+            "text_area": {
+                "padding_x": 20,
+                "padding_bottom": 16,
+                "gap_from_image": 0,
+                "block_spacing": 8,
+                "multiline_spacing": 4,
+                "position": "overlay",
+            },
+            "text_outline": {
+                "color": "#000000",
+                "thickness": 3,
+            },
+            "font": {
+                "font_candidates": [
+                    "impact.ttf",
+                ],
+                "download": {
+                    "url": "https://font.download/dl/font/impact.zip",
+                    "target_file": "impact.ttf",
+                    "archive_member": "impact.ttf",
+                },
+            },
+            "title": {
+                "size": 72,
+                "min_size": 24,
+            },
+            "subtitle": {
+                "size": 72,
+                "min_size": 24,
+            },
+            "text_lines": [
+                {
+                    "source": "title",
+                    "vertical_position": "top",
+                    "align": "center",
+                    "size": 72,
+                    "min_size": 24,
+                },
+                {
+                    "source": "subtitle",
+                    "vertical_position": "bottom",
+                    "align": "center",
+                    "size": 72,
+                    "min_size": 24,
+                },
+                {
+                    "source": "text_3",
+                    "vertical_position": "center",
+                    "align": "center",
+                    "size": 72,
+                    "min_size": 24,
+                },
+                {
+                    "source": "text_4",
+                    "vertical_position": "bottom",
+                    "align": "center",
+                    "size": 72,
+                    "min_size": 24,
+                },
+            ],
         }
     ]
 }

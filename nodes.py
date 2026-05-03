@@ -117,7 +117,9 @@ class ArtemKo7vMememizator:
                 "image": ("IMAGE",),
                 "template": (get_template_names(),),
                 "title": ("STRING", {"default": "", "multiline": False}),
-                "subtitle": ("STRING", {"default": "", "multiline": True}),
+                "subtitle": ("STRING", {"default": "", "multiline": False}),
+                "text_3": ("STRING", {"default": "", "multiline": False}),
+                "text_4": ("STRING", {"default": "", "multiline": False}),
             },
             "optional": {
                 "settings": (SETTINGS_TYPE,),
@@ -125,16 +127,18 @@ class ArtemKo7vMememizator:
         }
 
     # Renders meme images from input tensors and template settings.
-    def mememizate(self, image, template, title, subtitle, settings=None):
+    def mememizate(self, image, template, title, subtitle, text_3="", text_4="", settings=None):
         torch = require_torch()
 
         title_text = normalize_text(title)
         subtitle_text = normalize_text(subtitle)
+        text_3_text = normalize_text(text_3)
+        text_4_text = normalize_text(text_4)
         template_config = apply_settings_override(get_template_config(template), settings)
 
         if image.ndim == 3:
             single_image = tensor_to_pil(image)
-            rendered = render_meme(single_image, template_config, title_text, subtitle_text)
+            rendered = render_meme(single_image, template_config, title_text, subtitle_text, text_3_text, text_4_text)
             return (pil_to_tensor(rendered),)
 
         if image.ndim != 4:
@@ -143,7 +147,7 @@ class ArtemKo7vMememizator:
         rendered_batch = []
         for index in range(image.shape[0]):
             single_image = tensor_to_pil(image[index])
-            rendered = render_meme(single_image, template_config, title_text, subtitle_text)
+            rendered = render_meme(single_image, template_config, title_text, subtitle_text, text_3_text, text_4_text)
             rendered_batch.append(pil_to_tensor(rendered))
 
         return (torch.stack(rendered_batch, dim=0).cpu(),)

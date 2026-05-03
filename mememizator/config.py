@@ -80,6 +80,13 @@ def normalize_config(config: Any) -> dict[str, Any]:
         valid_templates.append(upgrade_legacy_template(merged_template))
 
     if valid_templates:
+        existing_names = {template["name"] for template in valid_templates}
+        for default_template in default_config.get("templates", []):
+            if not isinstance(default_template, dict):
+                continue
+            name = default_template.get("name")
+            if isinstance(name, str) and name not in existing_names:
+                valid_templates.append(copy.deepcopy(default_template))
         normalized["templates"] = valid_templates
 
     return normalized

@@ -15,6 +15,18 @@ def default_config_copy():
 
 
 class ConfigTests(unittest.TestCase):
+    # Provides both built-in templates in the default config.
+    def test_default_config_includes_classic_meme(self):
+        template_names = [template["name"] for template in DEFAULT_CONFIG["templates"]]
+
+        self.assertIn("Classic Demotivator", template_names)
+        self.assertIn("Classic Meme", template_names)
+
+        classic_meme = next(template for template in DEFAULT_CONFIG["templates"] if template["name"] == "Classic Meme")
+        self.assertEqual(classic_meme["type"], "classic_meme")
+        self.assertEqual(classic_meme["text_area"]["position"], "overlay")
+        self.assertEqual(len(classic_meme["text_lines"]), 4)
+
     # Normalizes invalid config input to the default config.
     def test_normalize_config_uses_defaults_for_invalid_input(self):
         with patch.object(config, "load_packaged_default_config", default_config_copy):
@@ -42,6 +54,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(template["frame"]["thickness"], 9)
         self.assertEqual(template["frame"]["gap"], DEFAULT_CONFIG["templates"][0]["frame"]["gap"])
         self.assertEqual(template["font"], DEFAULT_CONFIG["templates"][0]["font"])
+        self.assertEqual(normalized["templates"][1]["name"], "Classic Meme")
 
     # Loads and normalizes config files from the configured user path.
     def test_load_config_normalizes_user_config(self):
@@ -84,6 +97,7 @@ class ConfigTests(unittest.TestCase):
 
         self.assertEqual(loaded, saved)
         self.assertEqual(loaded["templates"][0]["frame"]["gap"], 12)
+        self.assertEqual(loaded["templates"][1]["name"], "Classic Meme")
         self.assertEqual(
             loaded["templates"][0]["frame"]["thickness"],
             DEFAULT_CONFIG["templates"][0]["frame"]["thickness"],

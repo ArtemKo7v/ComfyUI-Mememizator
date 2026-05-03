@@ -1,6 +1,6 @@
 import unittest
 
-from mememizator.render import get_text_block_start, get_text_region
+from mememizator.render import get_line_align, get_line_vertical_position, get_template_text_lines, get_text_block_start, get_text_region
 
 
 # Creates a template with a configurable text position.
@@ -58,6 +58,29 @@ class RenderLayoutTests(unittest.TestCase):
         self.assertEqual(get_text_block_start(10, 100, 40, "top"), 10)
         self.assertEqual(get_text_block_start(10, 100, 40, "center"), 40)
         self.assertEqual(get_text_block_start(10, 100, 40, "bottom"), 70)
+
+    # Limits configured text lines to four slots.
+    def test_get_template_text_lines_uses_first_four_lines(self):
+        lines = get_template_text_lines(
+            {
+                "text_lines": [
+                    {"source": "title"},
+                    {"source": "subtitle"},
+                    {"source": "text_3"},
+                    {"source": "text_4"},
+                    {"source": "ignored"},
+                ]
+            }
+        )
+
+        self.assertEqual([line["source"] for line in lines], ["title", "subtitle", "text_3", "text_4"])
+
+    # Falls back to safe per-line placement values.
+    def test_line_position_and_align_fallbacks(self):
+        self.assertEqual(get_line_vertical_position("top"), "top")
+        self.assertEqual(get_line_vertical_position("bad"), "center")
+        self.assertEqual(get_line_align("right"), "right")
+        self.assertEqual(get_line_align("bad"), "center")
 
 
 if __name__ == "__main__":

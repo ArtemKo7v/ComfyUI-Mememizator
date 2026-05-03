@@ -14,6 +14,12 @@ def get_primary_font_name(template: dict[str, Any]) -> str:
         candidates = get_font_candidates(template.get(key, {}))
         if candidates:
             return Path(candidates[0]).name
+    for line in template.get("text_lines", []):
+        if not isinstance(line, dict):
+            continue
+        candidates = get_font_candidates(line)
+        if candidates:
+            return Path(candidates[0]).name
     return TEMPLATE_DEFAULT_FONT
 
 
@@ -36,6 +42,9 @@ def get_settings_defaults(template_name: str | None = None) -> dict[str, Any]:
     text_outline = template.get("text_outline", {})
     title = template.get("title", {})
     subtitle = template.get("subtitle", {})
+    text_lines = [line for line in template.get("text_lines", []) if isinstance(line, dict)]
+    first_line = text_lines[0] if len(text_lines) > 0 else title
+    second_line = text_lines[1] if len(text_lines) > 1 else subtitle
 
     return {
         "template_name": template.get("name", get_first_template_name()),
@@ -56,10 +65,10 @@ def get_settings_defaults(template_name: str | None = None) -> dict[str, Any]:
         "multiline_spacing": get_int(text_area, "multiline_spacing", -1, minimum=-1),
         "extra_width": get_int(canvas_extra, "width", -1, minimum=-1),
         "extra_height": get_int(canvas_extra, "height", -1, minimum=-1),
-        "title_size": get_int(title, "size", -1, minimum=-1),
-        "title_min_size": get_int(title, "min_size", -1, minimum=-1),
-        "subtitle_size": get_int(subtitle, "size", -1, minimum=-1),
-        "subtitle_min_size": get_int(subtitle, "min_size", -1, minimum=-1),
+        "title_size": get_int(first_line, "size", -1, minimum=-1),
+        "title_min_size": get_int(first_line, "min_size", -1, minimum=-1),
+        "subtitle_size": get_int(second_line, "size", -1, minimum=-1),
+        "subtitle_min_size": get_int(second_line, "min_size", -1, minimum=-1),
         "font_name": get_primary_font_name(template),
     }
 
@@ -93,6 +102,7 @@ def apply_settings_override(template: dict[str, Any], settings: Any) -> dict[str
     text_outline = result.setdefault("text_outline", {})
     title = result.setdefault("title", {})
     subtitle = result.setdefault("subtitle", {})
+    text_lines = result.setdefault("text_lines", [])
     font = result.setdefault("font", {})
 
     apply_int_override(image_offset, "x", settings.get("padding_x"))
@@ -116,6 +126,13 @@ def apply_settings_override(template: dict[str, Any], settings: Any) -> dict[str
     apply_int_override(title, "min_size", settings.get("title_min_size"))
     apply_int_override(subtitle, "size", settings.get("subtitle_size"))
     apply_int_override(subtitle, "min_size", settings.get("subtitle_min_size"))
+    if isinstance(text_lines, list):
+        if len(text_lines) > 0 and isinstance(text_lines[0], dict):
+            apply_int_override(text_lines[0], "size", settings.get("title_size"))
+            apply_int_override(text_lines[0], "min_size", settings.get("title_min_size"))
+        if len(text_lines) > 1 and isinstance(text_lines[1], dict):
+            apply_int_override(text_lines[1], "size", settings.get("subtitle_size"))
+            apply_int_override(text_lines[1], "min_size", settings.get("subtitle_min_size"))
 
     font_name = normalize_optional_string(settings.get("font_name"))
     if font_name and font_name != TEMPLATE_DEFAULT_FONT:

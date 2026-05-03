@@ -179,6 +179,9 @@ def ensure_template_fonts_available() -> None:
         font_config = template.get("font")
         if isinstance(font_config, dict):
             download_font_assets(font_config)
+        for line in template.get("text_lines", []):
+            if isinstance(line, dict):
+                download_font_assets(line)
 
 
 # Returns font names available to the settings node.
@@ -195,6 +198,12 @@ def get_available_font_names() -> tuple[str, ...]:
             continue
         for key in ("font", "title", "subtitle"):
             for candidate in get_font_candidates(template.get(key, {})):
+                if candidate.lower().endswith(".ttf"):
+                    fallback_names.add(Path(candidate).name)
+        for line in template.get("text_lines", []):
+            if not isinstance(line, dict):
+                continue
+            for candidate in get_font_candidates(line):
                 if candidate.lower().endswith(".ttf"):
                     fallback_names.add(Path(candidate).name)
 
