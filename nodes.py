@@ -224,9 +224,6 @@ class ArtemKo7vMememizatorCombineImages:
             rendered = combine_images(images, layout, max_width, max_height, background, padding)
             rendered_batch.append(pil_to_tensor(rendered))
 
-        if len(rendered_batch) == 1:
-            return (rendered_batch[0],)
-
         return (torch.stack(rendered_batch, dim=0).cpu(),)
 
 
