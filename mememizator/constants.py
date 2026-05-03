@@ -14,6 +14,7 @@ TEMPLATE_DEFAULT_FONT = "(template default)"
 TEXT_POSITION_OPTIONS = ("below", "above", "overlay")
 TEXT_LINE_VERTICAL_POSITION_OPTIONS = ("top", "center", "bottom")
 TEXT_LINE_ALIGN_OPTIONS = ("left", "center", "right")
+COMBINE_LAYOUT_OPTIONS = ("horizontal", "vertical", "2x2")
 LEGACY_DEMOTIVATOR_FONT_CANDIDATES = [
     "times.ttf",
     "Times New Roman.ttf",

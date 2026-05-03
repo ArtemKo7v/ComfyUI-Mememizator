@@ -1,5 +1,6 @@
 from .mememizator.config import get_template_config, get_template_names
-from .mememizator.constants import SETTINGS_TYPE, TEXT_POSITION_OPTIONS
+from .mememizator.combine import combine_images
+from .mememizator.constants import COMBINE_LAYOUT_OPTIONS, SETTINGS_TYPE, TEXT_POSITION_OPTIONS
 from .mememizator.dependencies import require_torch
 from .mememizator.fonts import get_settings_font_options
 from .mememizator.render import render_meme
@@ -153,12 +154,90 @@ class ArtemKo7vMememizator:
         return (torch.stack(rendered_batch, dim=0).cpu(),)
 
 
+class ArtemKo7vMememizatorCombineImages:
+    CATEGORY = "ArtemKo7v"
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "combine"
+
+    # Defines the ComfyUI inputs for the image combine node.
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image_1": ("IMAGE",),
+                "layout": (COMBINE_LAYOUT_OPTIONS,),
+                "max_width": ("INT", {"default": 0, "min": 0, "max": 8192}),
+                "max_height": ("INT", {"default": 0, "min": 0, "max": 8192}),
+                "background": ("STRING", {"default": "#000000", "multiline": False}),
+                "padding": ("INT", {"default": 0, "min": 0, "max": 8192}),
+            },
+            "optional": {
+                "image_2": ("IMAGE",),
+                "image_3": ("IMAGE",),
+                "image_4": ("IMAGE",),
+            },
+        }
+
+    # Converts an IMAGE tensor into a list of PIL images.
+    def _image_tensor_to_pil_batch(self, image):
+        if image.ndim == 3:
+            return [tensor_to_pil(image)]
+        if image.ndim == 4:
+            return [tensor_to_pil(image[index]) for index in range(image.shape[0])]
+        raise RuntimeError(f"Expected IMAGE tensor with 3 or 4 dimensions, got shape {tuple(image.shape)}")
+
+    # Returns a batch item, broadcasting singleton inputs when needed.
+    def _get_batch_item(self, images, index: int, batch_size: int):
+        if len(images) == batch_size:
+            return images[index]
+        if len(images) == 1:
+            return images[0]
+        raise RuntimeError(
+            f"Image batch sizes must match or be singletons, got input with {len(images)} images for batch size {batch_size}"
+        )
+
+    # Combines up to four image inputs into one image or one image batch.
+    def combine(
+        self,
+        image_1,
+        layout,
+        max_width,
+        max_height,
+        background,
+        padding,
+        image_2=None,
+        image_3=None,
+        image_4=None,
+    ):
+        torch = require_torch()
+        input_batches = [
+            self._image_tensor_to_pil_batch(image)
+            for image in (image_1, image_2, image_3, image_4)
+            if image is not None
+        ]
+        batch_size = max(len(images) for images in input_batches)
+
+        rendered_batch = []
+        for index in range(batch_size):
+            images = [self._get_batch_item(batch, index, batch_size) for batch in input_batches]
+            rendered = combine_images(images, layout, max_width, max_height, background, padding)
+            rendered_batch.append(pil_to_tensor(rendered))
+
+        if len(rendered_batch) == 1:
+            return (rendered_batch[0],)
+
+        return (torch.stack(rendered_batch, dim=0).cpu(),)
+
+
 NODE_CLASS_MAPPINGS = {
     "ArtemKo7vMememizator": ArtemKo7vMememizator,
     "ArtemKo7vMememizatorSettings": ArtemKo7vMememizatorSettings,
+    "ArtemKo7vMememizatorCombineImages": ArtemKo7vMememizatorCombineImages,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "ArtemKo7vMememizator": "Mememizator",
     "ArtemKo7vMememizatorSettings": "Mememizator Settings",
+    "ArtemKo7vMememizatorCombineImages": "Mememizator Combine Images",
 }
