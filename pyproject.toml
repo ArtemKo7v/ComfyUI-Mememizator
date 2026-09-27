@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "comfyui-mememizator"
 description = "ComfyUI node to make memes and demotivators"
-version = "0.1.0"
+version = "0.1.1"
 license = { text = "MIT" }
 dependencies = [
   "numpy>=1.24.0",
@@ -18,6 +18,7 @@ Repository = "https://github.com/ArtemKo7v/ComfyUI-Mememizator"
 [tool.comfy]
 PublisherId = "artemko7v"
 DisplayName = "ComfyUI Mememizator"
+Icon = "https://raw.githubusercontent.com/ArtemKo7v/ComfyUI-Mememizator/main/images/icon.gif"
 
 [tool.setuptools]
 packages = ["mememizator"]
